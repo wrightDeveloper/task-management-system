@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import taskRoutes from "./routes/taskRoutes.js";
 
 dotenv.config();
 
@@ -21,5 +22,7 @@ app.use("/api/tasks", (req, res) => res.send("Task route"));
 app.use("/api/comments", (req, res) => res.send("Comments route"));
 app.use("/api/assets", (req, res) => res.send("Assets route"));
 app.use("/api/chat", (req, res) => res.send("Chat route"));
+
+app.use("/api/tasks", taskRoutes);
 
 export default app;
