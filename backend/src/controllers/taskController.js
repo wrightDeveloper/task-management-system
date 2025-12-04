@@ -1,5 +1,8 @@
 import Task from "../models/task";
 import Activity from "../models/activity.model";
+import Subtask from "../models/subTask";
+import Asset from "../models/asset.model";
+
 
 export const logActivity  = async ({taskId, userId, action, details = " "}) => {
     try{
@@ -196,5 +199,225 @@ export const deleteTask = async (req, res) => {
         res.json({ message: "Task deleted" });
     } catch (error) {
         res.status(500).json({message: error.message});
+    }
+};
+
+//SUBTASKS
+export const addSubtask = async (req, res) => {
+    try {
+        const {taskId} = req.params;
+        const {title} = req.body;
+
+        if (!title) {
+            return res.status(400).json({message: "Subtask title required"});
+        }
+
+        const task = await Task.findOne({_id: taskId, user: req.user.id });
+        if (!task) {
+            return res.status(404).json({message: "Task not found"});
+        }
+
+        const subtask = await Subtask.create({
+            task: taskId,
+            title,
+            assignedTo,
+            dueDate,
+            notes,
+            completed: false,
+        });
+
+        task.subtasks.push(subtask._id);
+        await task.save();
+
+        return res.status(201).json({
+            message: "Subtask added",
+            subtask,
+          });
+    } catch (error) {
+        console.error("Error adding subtask:", error);
+        return res.status(500).json({ message: "Server error" });
+      }
+};
+
+
+export const updateSubtask = async (req, res) => {
+    try {
+        const { taskId, subtaskId } = req.params;
+
+        // Ensure the task exists
+        const task = await Task.findById(taskId);
+        if (!task) {
+            return res.status(404).json({ message: "Task not found" });
+        }
+
+        // Ensure the subtask exists
+        let subtask = await Subtask.findById(subtaskId);
+        if (!subtask) {
+            return res.status(404).json({ message: "Subtask not found" });
+        }
+
+        // Update fields sent in body
+        const updates = req.body;
+        Object.assign(subtask, updates);
+
+        await subtask.save();
+
+        // Add activity log
+        await logActivity({
+            task: task._id,
+            user: req.user.id,
+            action: "Subtask Updated",
+            details: `Updated subtask: ${subtask.title}`,
+          });
+
+        await task.save();
+
+        return res.json({
+            message: "Subtask updated successfully",
+            subtask,
+        });
+
+    } catch (error) {
+        console.error("Update subtask error:", error);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+
+
+export const deleteSubtask = async (req, res) => {
+    try {
+        const { taskId, subtaskId } = req.params;
+
+        // Ensure the task exists
+        const task = await Task.findById(taskId);
+        if (!task) return res.status(404).json({ message: "Task not found" });
+
+        // Ensure the subtask exists
+        const subtask = await Subtask.findById(subtaskId);
+        if (!subtask) return res.status(404).json({ message: "Subtask not found" });
+
+        // Remove from Subtask collection
+        await Subtask.findByIdAndDelete(subtaskId);
+
+        // Remove from task.subtasks array
+        task.subtasks = task.subtasks.filter(id => id.toString() !== subtaskId);
+
+        // Add activity log
+       await logActivity({
+            task: task._id,
+            user: req.user.id,
+            action: "Subtask Deleted",
+            details: `Deleted subtask: ${subtask.title}`,
+          });
+
+        await task.save();
+
+        return res.json({ message: "Subtask deleted successfully" });
+
+    } catch (error) {
+        console.error("Delete subtask error:", error);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+
+
+// ASSETS
+export const uploadAssets = async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        const { type, link, description } = req.body;
+
+        if (!type || !link) {
+            return res.status(400).json({
+              message: "Asset type and link are required",
+            });
+          }
+
+          const task = await Task.findOne({ _id: taskId, user: req.user.id });
+
+        if (!task) {
+             return res.status(404).json({ message: "Task not found" });
+         }
+
+         const asset = await Asset.create({
+            task: taskId,
+            fileUrl,
+            fileName,
+            fileType,
+          });
+
+          task.assets.push(asset._id);
+          await task.save();
+
+          return res.status(201).json({
+            message: "Asset added",
+            asset,
+          });
+    } catch (error) {
+        console.error("Error adding asset:", error);
+        return res.status(500).json({ message: "Server error" });
+      } 
+};
+
+export const deleteAsset = async (req, res) => {
+    try {
+        const { taskId, assetId } = req.params;
+
+        const task = await Task.findById(taskId);
+        if (!task) return res.status(404).json({ message: "Task not found" });
+
+        // Find asset
+        const asset = task.assets.id(assetId);
+        if (!asset) return res.status(404).json({ message: "Asset not found" });
+
+        // Remove asset from array
+        asset.deleteOne();
+
+        // Activity log
+        await logActivity({
+            task: task._id,
+            user: req.user.id,
+            action: "Asset Deleted",
+            details: `Deleted asset: ${asset.fileName}`,
+          });
+
+        await task.save();
+
+        return res.json({ message: "Asset deleted successfully" });
+
+    } catch (error) {
+        console.error("Delete asset error:", error);
+        return res.status(500).json({ message: "Server error" });
+    }
+};
+
+
+
+export const updateAsset = async (req, res) => {
+    try {
+        const { taskId, assetId } = req.params;
+
+        const task = await Task.findById(taskId);
+        if (!task) return res.status(404).json({ message: "Task not found" });
+
+        const asset = task.assets.id(assetId);
+        if (!asset) return res.status(404).json({ message: "Asset not found" });
+
+        Object.assign(asset, req.body); // update metadata (not file upload)
+
+        await logActivity({
+            task: task._id,
+            user: req.user.id,
+            action: "Asset Updated",
+            details: `Updated Asset: ${Asset.title}`,
+          });
+
+        await task.save();
+
+        return res.json({ message: "Asset updated successfully", asset });
+
+    } catch (error) {
+        console.error("Update asset error:", error);
+        return res.status(500).json({ message: "Server error" });
     }
 };

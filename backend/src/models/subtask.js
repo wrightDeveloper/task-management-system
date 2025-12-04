@@ -22,7 +22,7 @@ const subtaskSchema = new mongoose.Schema ({
     dueDate: {
         type: Date,
       },
-      notes: {
+    notes: {
         type: String,
         default: "",
       },
@@ -30,4 +30,7 @@ const subtaskSchema = new mongoose.Schema ({
     { timestamps: true }
 );
 
-export default mongoose.model("Subtask", subtaskSchema);
+
+const Subtask = mongoose.model("Subtask", subtaskSchema);
+
+export default Subtask;
